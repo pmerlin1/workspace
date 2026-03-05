@@ -816,6 +816,16 @@ export class DocsService {
       element.paragraph.elements?.forEach((pElement) => {
         if (pElement.textRun && pElement.textRun.content) {
           text += pElement.textRun.content;
+        } else if (pElement.person?.personProperties) {
+          text += this._renderPersonChip(pElement.person.personProperties);
+        } else if (pElement.richLink?.richLinkProperties) {
+          text += this._renderRichLinkChip(
+            pElement.richLink.richLinkProperties,
+          );
+        } else if (pElement.dateElement?.dateElementProperties) {
+          text += this._renderDateChip(
+            pElement.dateElement.dateElementProperties,
+          );
         }
       });
     } else if (element.table) {
@@ -828,6 +838,29 @@ export class DocsService {
       });
     }
     return text;
+  }
+
+  private _renderPersonChip(props: docs_v1.Schema$PersonProperties): string {
+    const { name, email } = props;
+    if (email) {
+      return `[${name || email}](mailto:${email})`;
+    }
+    return name || '';
+  }
+
+  private _renderRichLinkChip(
+    props: docs_v1.Schema$RichLinkProperties,
+  ): string {
+    const { title, uri } = props;
+    if (uri) {
+      return `[${title || uri}](${uri})`;
+    }
+    return title || '';
+  }
+
+  private _renderDateChip(props: docs_v1.Schema$DateElementProperties): string {
+    const { displayText, timestamp } = props;
+    return displayText || timestamp || '';
   }
 
   public replaceText = async ({
