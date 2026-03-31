@@ -58,6 +58,7 @@ describe('DocsService Comments and Suggestions', () => {
     it('should return suggestions as type text with JSON-stringified array', async () => {
       mockDocsAPI.documents.get.mockResolvedValue({
         data: {
+          title: 'Test Document',
           body: {
             content: [
               {
@@ -84,7 +85,9 @@ describe('DocsService Comments and Suggestions', () => {
       });
 
       expect(result.content[0].type).toBe('text');
-      const suggestions = JSON.parse(result.content[0].text);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.title).toBe('Test Document');
+      const { suggestions } = parsed;
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0]).toEqual({
         type: 'insertion',
@@ -123,7 +126,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].type).toBe('insertion');
       expect(suggestions[0].suggestionIds).toEqual(['sug-1', 'sug-2']);
@@ -157,7 +160,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].type).toBe('deletion');
       expect(suggestions[0].text).toBe('deleted text');
@@ -194,7 +197,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].type).toBe('styleChange');
       expect(suggestions[0].suggestionIds).toEqual(['style-1']);
@@ -234,7 +237,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].type).toBe('paragraphStyleChange');
       expect(suggestions[0].suggestionIds).toEqual(['sug-para-1']);
@@ -284,7 +287,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].type).toBe('insertion');
       expect(suggestions[0].text).toBe('cell text');
@@ -299,8 +302,8 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
-      expect(suggestions).toEqual([]);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.suggestions).toEqual([]);
     });
 
     it('should handle API errors gracefully', async () => {
@@ -351,7 +354,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(2);
       const types = suggestions.map((s: any) => s.type);
       expect(types).toEqual(['paragraphStyleChange', 'paragraphStyleChange']);
@@ -391,7 +394,7 @@ describe('DocsService Comments and Suggestions', () => {
         documentId: 'test-doc-id',
       });
 
-      const suggestions = JSON.parse(result.content[0].text);
+      const { suggestions } = JSON.parse(result.content[0].text);
       expect(suggestions).toHaveLength(1);
       expect(suggestions[0].text).toBe('');
     });
