@@ -260,15 +260,42 @@ export class CalendarService {
     const summary =
       input.summary ?? (eventType ? summaryDefaults[eventType] : undefined);
 
-    // Validate start/end: at least one of dateTime or date must be provided
-    if ((!start.dateTime && !start.date) || (!end.dateTime && !end.date)) {
+    // Validate start: exactly one of dateTime or date must be provided
+    if ((!start.dateTime && !start.date) || (start.dateTime && start.date)) {
       return this.createValidationErrorResponse(
         new z.ZodError([
           {
             code: 'custom',
             message:
-              'start and end must each have either "dateTime" (for timed events) or "date" (for all-day events)',
-            path: ['start/end'],
+              'start must have exactly one of "dateTime" (for timed events) or "date" (for all-day events)',
+            path: ['start'],
+          },
+        ]),
+      );
+    }
+
+    // Validate end: exactly one of dateTime or date must be provided
+    if ((!end.dateTime && !end.date) || (end.dateTime && end.date)) {
+      return this.createValidationErrorResponse(
+        new z.ZodError([
+          {
+            code: 'custom',
+            message:
+              'end must have exactly one of "dateTime" (for timed events) or "date" (for all-day events)',
+            path: ['end'],
+          },
+        ]),
+      );
+    }
+
+    // Require summary for regular events
+    if ((!eventType || eventType === 'default') && !input.summary) {
+      return this.createValidationErrorResponse(
+        new z.ZodError([
+          {
+            code: 'custom',
+            message: 'summary is required for regular events',
+            path: ['summary'],
           },
         ]),
       );
@@ -302,6 +329,40 @@ export class CalendarService {
           },
         ]),
       );
+    }
+
+    // Validate working location sub-properties match the declared type
+    if (eventType === 'workingLocation' && workingLocationProperties) {
+      if (
+        workingLocationProperties.type === 'officeLocation' &&
+        !workingLocationProperties.officeLocation
+      ) {
+        return this.createValidationErrorResponse(
+          new z.ZodError([
+            {
+              code: 'custom',
+              message:
+                'officeLocation is required when workingLocationProperties.type is "officeLocation"',
+              path: ['workingLocationProperties', 'officeLocation'],
+            },
+          ]),
+        );
+      }
+      if (
+        workingLocationProperties.type === 'customLocation' &&
+        !workingLocationProperties.customLocation
+      ) {
+        return this.createValidationErrorResponse(
+          new z.ZodError([
+            {
+              code: 'custom',
+              message:
+                'customLocation is required when workingLocationProperties.type is "customLocation"',
+              path: ['workingLocationProperties', 'customLocation'],
+            },
+          ]),
+        );
+      }
     }
 
     // Validate datetime formats (skip for date-only / all-day events)
@@ -611,12 +672,40 @@ export class CalendarService {
       attachments,
     } = input;
 
+    // Validate start/end: if provided, exactly one of dateTime or date
+    if (start) {
+      if ((start.dateTime && start.date) || (!start.dateTime && !start.date)) {
+        return this.createValidationErrorResponse(
+          new z.ZodError([
+            {
+              code: 'custom',
+              message: 'start must have exactly one of "dateTime" or "date"',
+              path: ['start'],
+            },
+          ]),
+        );
+      }
+    }
+    if (end) {
+      if ((end.dateTime && end.date) || (!end.dateTime && !end.date)) {
+        return this.createValidationErrorResponse(
+          new z.ZodError([
+            {
+              code: 'custom',
+              message: 'end must have exactly one of "dateTime" or "date"',
+              path: ['end'],
+            },
+          ]),
+        );
+      }
+    }
+
     // Validate datetime formats if provided
     try {
-      if (start) {
+      if (start?.dateTime !== undefined) {
         iso8601DateTimeSchema.parse(start.dateTime);
       }
-      if (end) {
+      if (end?.dateTime !== undefined) {
         iso8601DateTimeSchema.parse(end.dateTime);
       }
       if (attendees) {
