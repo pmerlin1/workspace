@@ -12,7 +12,10 @@ import {
   jest,
   afterEach,
 } from '@jest/globals';
-import { openBrowserSecurely } from '../../utils/secure-browser-launcher';
+import {
+  openBrowserSecurely,
+  shouldLaunchBrowser,
+} from '../../utils/secure-browser-launcher';
 import { platform } from 'node:os';
 import { EventEmitter } from 'node:events';
 import { ChildProcess } from 'node:child_process';
@@ -24,14 +27,28 @@ const mockPlatform = platform as jest.Mock;
 describe('secure-browser-launcher', () => {
   let mockChild: EventEmitter;
   let mockExecFile: jest.Mock;
+  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    originalEnv = process.env;
+    process.env = { ...originalEnv };
+    delete process.env.CI;
+    delete process.env.DEBIAN_FRONTEND;
+    delete process.env.WSL_DISTRO_NAME;
+    delete process.env.WSL_INTEROP;
+    delete process.env.SSH_CONNECTION;
+    delete process.env.DISPLAY;
+    delete process.env.WAYLAND_DISPLAY;
+    delete process.env.MIR_SOCKET;
+    delete process.env.BROWSER;
+
     mockChild = new EventEmitter();
     mockExecFile = jest.fn().mockReturnValue(mockChild as ChildProcess);
     mockPlatform.mockReturnValue('darwin'); // Default to macOS
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     jest.clearAllMocks();
   });
 
@@ -310,6 +327,24 @@ describe('secure-browser-launcher', () => {
         expect.any(Object),
         expect.any(Function),
       );
+    });
+  });
+
+  describe('shouldLaunchBrowser', () => {
+    it('should treat WSL as headless even when display variables are present', () => {
+      mockPlatform.mockReturnValue('linux');
+      process.env.DISPLAY = ':0';
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      process.env.WSL_DISTRO_NAME = 'Ubuntu';
+
+      expect(shouldLaunchBrowser()).toBe(false);
+    });
+
+    it('should allow Linux browser launch when a display exists outside WSL', () => {
+      mockPlatform.mockReturnValue('linux');
+      process.env.DISPLAY = ':0';
+
+      expect(shouldLaunchBrowser()).toBe(true);
     });
   });
 });

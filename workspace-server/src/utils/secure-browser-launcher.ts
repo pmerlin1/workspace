@@ -206,6 +206,12 @@ export function shouldLaunchBrowser(): boolean {
     return false;
   }
 
+  // WSL: even though WSLg sets DISPLAY/WAYLAND_DISPLAY, browser auto-launch
+  // via xdg-open / `open` is unreliable. Treat as headless and surface the URL.
+  if (process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP) {
+    return false;
+  }
+
   // The presence of SSH_CONNECTION indicates a remote session.
   // We should not attempt to launch a browser unless a display is explicitly available
   // (checked below for Linux).
