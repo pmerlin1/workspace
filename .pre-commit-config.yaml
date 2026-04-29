@@ -1,0 +1,33 @@
+repos:
+  - repo: local
+    hooks:
+      - id: trufflehog
+        name: TruffleHog secret scan
+        entry: bash -c 'PATH="$HOME/.local/bin:$PATH"; if [ "$#" -gt 0 ]; then trufflehog filesystem "$@" --config .trufflehog.yml --results=verified,unknown,unverified --fail; else trufflehog git file://. --since-commit HEAD --config .trufflehog.yml --results=verified,unknown,unverified --fail; fi' --
+        language: system
+        stages: [pre-commit, pre-push]
+
+      - id: prettier-check
+        name: Prettier format check
+        entry: npm run format:check
+        language: system
+        pass_filenames: false
+
+      - id: eslint
+        name: ESLint
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+
+      - id: jest
+        name: Jest test suite
+        entry: npm test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: build
+        name: Build bundles
+        entry: npm run build
+        language: system
+        pass_filenames: false

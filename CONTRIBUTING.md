@@ -83,13 +83,16 @@ ready for a formal review but is open for discussion and initial feedback.
 #### 4. Ensure All Checks Pass
 
 Before submitting your PR, ensure that all automated checks are passing by
-running:
+running `npm run validate`. This command verifies formatting, runs ESLint, runs
+the test suite, builds the bundles, and runs the TypeScript compiler check.
+
+This repository also supports local pre-commit checks, including TruffleHog
+secret scanning:
 
 ```bash
-npm run test && npm run lint && npm run format:check && npx tsc --noEmit --project workspace-server
+pre-commit install
+pre-commit install --hook-type pre-push
 ```
-
-This command runs all tests, linting, formatting, and type checks.
 
 #### 5. Write Clear Commit Messages and a Good PR Description
 

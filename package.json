@@ -16,6 +16,7 @@
     "test:watch": "npm run test:watch --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
     "test:ci": "npm run test:ci --workspaces --if-present",
+    "validate": "npm run format:check && npm run lint && npm test && npm run build && npx tsc --noEmit --project workspace-server",
     "start": "npm run start --workspaces --if-present",
     "auth-utils": "npm run build:auth-utils -w workspace-server && node scripts/auth-utils.js",
     "clean": "node scripts/clean.js",

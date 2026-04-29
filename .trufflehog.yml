@@ -1,0 +1,20 @@
+detectors:
+  - name: google oauth client secret
+    keywords:
+      - GOCSPX
+      - client_secret
+    regex:
+      secret: 'GOCSPX-[A-Za-z0-9_-]{20,}'
+
+  - name: google oauth access token
+    keywords:
+      - ya29
+    regex:
+      token: 'ya29\.[A-Za-z0-9._-]{20,}'
+
+  - name: google oauth refresh token
+    keywords:
+      - refresh_token
+      - 1//
+    regex:
+      token: '1//[A-Za-z0-9._-]{20,}'
