@@ -69,6 +69,29 @@ are read securely from `/dev/tty` and are never exposed to the AI model. See the
 [development docs](docs/development.md#headless--remote-environments) for more
 details.
 
+## Local stdio MCP clients
+
+The MCP server can also be launched directly by local stdio MCP clients such as
+Claude Code or Codex. To use your own Google OAuth installed-app client instead
+of the hosted cloud-function OAuth flow, set these environment variables on the
+MCP server process:
+
+```bash
+WORKSPACE_AUTH_MODE=installed-app
+WORKSPACE_CLIENT_ID=your-installed-app-client-id
+WORKSPACE_CLIENT_SECRET=your-installed-app-client-secret
+```
+
+Then configure the MCP client to run:
+
+```bash
+node /path/to/workspace/workspace-server/dist/index.js --debug --use-dot-names
+```
+
+This keeps the MCP transport vendor-neutral: Claude Code, Codex, or any other
+stdio MCP client can launch the same server command. The OAuth grant belongs to
+the local server process, not to a vendor-specific hosted MCP endpoint.
+
 ## Deployment
 
 If you want to host your own version of this extension's infrastructure, see the
