@@ -16,8 +16,18 @@ import type { KeychainTokenStorage } from '../../../auth/token-storage/keychain-
 import type { OAuthCredentials } from '../../../auth/token-storage/types';
 import type keytar from 'keytar';
 
-// Mock the entire keytar module.
-jest.mock('keytar');
+const mockKeytarModule = {
+  getPassword: jest.fn(),
+  setPassword: jest.fn(),
+  deletePassword: jest.fn(),
+  findCredentials: jest.fn(),
+};
+
+jest.mock('keytar', () => ({
+  __esModule: true,
+  default: mockKeytarModule,
+  ...mockKeytarModule,
+}));
 
 // We will get a reference to the mock inside `beforeEach`.
 let mockKeytar: jest.Mocked<typeof keytar>;

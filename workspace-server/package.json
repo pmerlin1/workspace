@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "test": "cd .. && node --max-old-space-size=4096 node_modules/jest/bin/jest.js --runInBand --verbose",
+    "test": "cd .. && node --max-old-space-size=8192 node_modules/jest/bin/jest.js --runInBand --verbose",
     "test:watch": "cd .. && jest --watch",
     "test:coverage": "cd .. && node --max-old-space-size=4096 node_modules/jest/bin/jest.js --coverage",
     "test:ci": "cd .. && node --max-old-space-size=4096 node_modules/jest/bin/jest.js --ci --coverage --maxWorkers=2",
