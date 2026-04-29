@@ -30,6 +30,7 @@ import { loadConfig } from '../utils/config';
 
 const config = loadConfig();
 const CLIENT_ID = config.clientId;
+const CLIENT_SECRET = config.clientSecret;
 const CLOUD_FUNCTION_URL = config.cloudFunctionUrl;
 
 interface CredentialsJson {
@@ -153,7 +154,17 @@ function generateOAuthUrl(): string {
   };
   const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
 
-  const oAuth2Client = new google.auth.OAuth2({ clientId: CLIENT_ID });
+  const oAuth2Client = new google.auth.OAuth2({
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+  });
+
+  if (config.authMode === 'installed-app') {
+    throw new Error(
+      'Headless pasted-JSON login requires the cloud-function OAuth mode. ' +
+        'For installed-app mode, start the MCP server and complete the local browser login.',
+    );
+  }
 
   return oAuth2Client.generateAuthUrl({
     redirect_uri: CLOUD_FUNCTION_URL,

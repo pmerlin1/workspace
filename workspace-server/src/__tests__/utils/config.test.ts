@@ -24,6 +24,10 @@ describe('config', () => {
     jest.resetModules();
     process.env = { ...originalEnv };
     delete process.env['WORKSPACE_CLIENT_ID'];
+    delete process.env['WORKSPACE_CLIENT_SECRET'];
+    delete process.env['WORKSPACE_AUTH_MODE'];
+    delete process.env['WORKSPACE_AUTH_URI'];
+    delete process.env['WORKSPACE_TOKEN_URI'];
     delete process.env['WORKSPACE_CLOUD_FUNCTION_URL'];
   });
 
@@ -41,6 +45,7 @@ describe('config', () => {
     expect(config.cloudFunctionUrl).toBe(
       'https://google-workspace-extension.geminicli.com',
     );
+    expect(config.authMode).toBe('cloud-function');
   });
 
   it('should use env vars when set', async () => {
@@ -52,6 +57,18 @@ describe('config', () => {
 
     expect(config.clientId).toBe('custom-client-id');
     expect(config.cloudFunctionUrl).toBe('https://custom.example.com');
+  });
+
+  it('should use installed app mode when a client secret is set', async () => {
+    process.env['WORKSPACE_CLIENT_ID'] = 'custom-client-id';
+    process.env['WORKSPACE_CLIENT_SECRET'] = 'custom-client-secret';
+
+    const { loadConfig } = await import('../../utils/config');
+    const config = loadConfig();
+
+    expect(config.clientId).toBe('custom-client-id');
+    expect(config.clientSecret).toBe('custom-client-secret');
+    expect(config.authMode).toBe('installed-app');
   });
 
   it('should fall back to defaults for partial env var configuration', async () => {

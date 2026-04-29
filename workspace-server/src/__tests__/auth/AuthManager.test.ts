@@ -122,6 +122,18 @@ describe('AuthManager', () => {
     );
   });
 
+  it('should fail fast on manual refresh when no cached refresh token exists', async () => {
+    (OAuthCredentialStorage.loadCredentials as jest.Mock).mockResolvedValue(
+      null,
+    );
+
+    await expect(authManager.refreshToken()).rejects.toThrow(
+      'No refresh token available. Authenticate first',
+    );
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('should preserve refresh token when refreshAccessToken mutates credentials in-place', async () => {
     // Setup initial state with a refresh token
     (OAuthCredentialStorage.loadCredentials as jest.Mock).mockResolvedValue({

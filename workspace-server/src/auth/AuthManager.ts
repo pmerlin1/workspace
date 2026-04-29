@@ -17,6 +17,7 @@ import { loadConfig } from '../utils/config';
 
 const config = loadConfig();
 const CLIENT_ID = config.clientId;
+const CLIENT_SECRET = config.clientSecret;
 const CLOUD_FUNCTION_URL = config.cloudFunctionUrl;
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -120,9 +121,9 @@ export class AuthManager {
       }
     }
 
-    // Note: No clientSecret is provided here. The secret is only known by the cloud function.
     const options: Auth.OAuth2ClientOptions = {
       clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
     };
     const oAuth2Client = new google.auth.OAuth2(options);
 
@@ -174,8 +175,10 @@ export class AuthManager {
       }
     }
 
-    // Fail fast in headless environments instead of hanging for 5 minutes
-    if (!shouldLaunchBrowser()) {
+    // Fail fast for the cloud-function flow in headless environments instead
+    // of hanging. Installed-app mode can still print a URL and receive the
+    // localhost callback after the user opens it manually.
+    if (!shouldLaunchBrowser() && config.authMode !== 'installed-app') {
       throw new Error(
         'No browser available for authentication. ' +
           'Please run: node dist/headless-login.js\n' +
@@ -185,6 +188,29 @@ export class AuthManager {
     }
 
     const webLogin = await this.authWithWeb(oAuth2Client);
+    if (!shouldLaunchBrowser()) {
+      // Headless / WSL: return the URL synchronously via a thrown error so it
+      // appears in the tool result. The localhost callback server stays
+      // listening; once the user opens the URL and grants access, credentials
+      // are saved by the callback handler. The next tool call will pick up the
+      // saved credentials from disk.
+      webLogin.loginCompletePromise
+        .then(async () => {
+          await OAuthCredentialStorage.saveCredentials(
+            oAuth2Client.credentials,
+          );
+          this.client = oAuth2Client;
+          logToFile('Headless auth complete; credentials saved.');
+        })
+        .catch((e) => logToFile(`Headless auth failed: ${e}`));
+
+      throw new Error(
+        'Authentication required. Open this URL in any browser to grant ' +
+          'access, then retry your request:\n\n' +
+          webLogin.authUrl,
+      );
+    }
+
     await open(webLogin.authUrl);
     const msg = 'Waiting for authentication... Check your browser.';
     logToFile(msg);
@@ -221,8 +247,19 @@ export class AuthManager {
   public async refreshToken(): Promise<void> {
     logToFile('Manual token refresh triggered');
     if (!this.client) {
-      logToFile('No client available to refresh, getting new client');
-      this.client = await this.getAuthenticatedClient();
+      logToFile('No client available to refresh, checking cached credentials');
+      const cachedCredentials = await OAuthCredentialStorage.loadCredentials();
+      if (!cachedCredentials?.refresh_token) {
+        throw new Error(
+          'No refresh token available. Authenticate first by calling a Google Workspace tool and completing OAuth.',
+        );
+      }
+
+      this.client = new google.auth.OAuth2({
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+      });
+      this.client.setCredentials(cachedCredentials);
     }
     try {
       const currentCredentials = { ...this.client.credentials };
@@ -231,28 +268,35 @@ export class AuthManager {
         throw new Error('No refresh token available');
       }
 
-      logToFile('Calling cloud function to refresh token...');
+      let newTokens: Auth.Credentials;
+      if (config.authMode === 'installed-app') {
+        logToFile('Refreshing token directly for installed-app OAuth mode...');
+        const refreshed = await this.client.refreshAccessToken();
+        newTokens = refreshed.credentials;
+      } else {
+        logToFile('Calling cloud function to refresh token...');
 
-      // Call the cloud function refresh endpoint
-      // The cloud function has the client secret needed for token refresh
-      const response = await fetch(`${CLOUD_FUNCTION_URL}/refreshToken`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          refresh_token: currentCredentials.refresh_token,
-        }),
-      });
+        // Call the cloud function refresh endpoint.
+        // The cloud function has the client secret needed for token refresh.
+        const response = await fetch(`${CLOUD_FUNCTION_URL}/refreshToken`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            refresh_token: currentCredentials.refresh_token,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Token refresh failed: ${response.status} ${errorText}`,
-        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Token refresh failed: ${response.status} ${errorText}`,
+          );
+        }
+
+        newTokens = await response.json();
       }
-
-      const newTokens = await response.json();
 
       // Merge new tokens with existing credentials, preserving refresh_token
       // Note: Google does NOT return a new refresh_token on refresh
@@ -263,7 +307,7 @@ export class AuthManager {
 
       this.client.setCredentials(mergedCredentials);
       await OAuthCredentialStorage.saveCredentials(mergedCredentials);
-      logToFile('Token refreshed and saved successfully via cloud function');
+      logToFile('Token refreshed and saved successfully');
     } catch (error) {
       logToFile(`Error during token refresh: ${error}`);
       throw error;
@@ -316,19 +360,23 @@ export class AuthManager {
     // SECURITY: Generate a random token for CSRF protection.
     const csrfToken = crypto.randomBytes(32).toString('hex');
 
-    // The state now contains a JSON payload indicating the flow mode and CSRF token.
     const statePayload = {
       uri: isGuiAvailable ? localRedirectUri : undefined,
       manual: !isGuiAvailable,
       csrf: csrfToken,
     };
-    const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
+    const state =
+      config.authMode === 'installed-app'
+        ? csrfToken
+        : Buffer.from(JSON.stringify(statePayload)).toString('base64');
 
-    // The redirect URI for Google's auth server is the cloud function
-    const cloudFunctionRedirectUri = CLOUD_FUNCTION_URL;
+    const redirectUri =
+      config.authMode === 'installed-app'
+        ? localRedirectUri
+        : CLOUD_FUNCTION_URL;
 
     const authUrl = client.generateAuthUrl({
-      redirect_uri: cloudFunctionRedirectUri, // Tell Google to go to the cloud function
+      redirect_uri: redirectUri,
       access_type: 'offline',
       scope: this.scopes,
       state: state, // Pass our JSON payload in the state
@@ -370,6 +418,19 @@ export class AuthManager {
                 `Google OAuth error: ${errorCode}. ${errorDescription}`,
               ),
             );
+            return;
+          }
+
+          const code = qs.get('code');
+
+          if (config.authMode === 'installed-app' && code) {
+            const { tokens } = await client.getToken({
+              code,
+              redirect_uri: localRedirectUri,
+            });
+            client.setCredentials(tokens);
+            res.end('Authentication successful! Please return to the console.');
+            resolve();
             return;
           }
 
